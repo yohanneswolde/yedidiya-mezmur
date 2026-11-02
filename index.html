@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="am"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#172b46"><title>ይዲድያ መዝሙር</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#101827;color:white;font-family:Arial,sans-serif;padding-bottom:75px}header{padding:22px;background:#172b46}.logo{color:#e6bd65;font-size:25px;font-weight:bold}.sub,.meta,.hint{color:#b9c3d0;font-size:13px}.page{display:none;padding:18px}.page.active{display:block}h2,h3{color:#e6bd65}.welcome,.card,.song{background:#202d40;border-radius:14px;padding:16px;margin:12px 0}.welcome{background:linear-gradient(135deg,#a77b32,#62451f);line-height:1.6}input,textarea,select{width:100%;padding:13px;margin:7px 0 14px;border-radius:10px;border:1px solid #39475b;background:#202d40;color:white;font-size:15px}textarea{min-height:140px;line-height:1.7}label{font-size:14px;color:#e9d7ad}.btn{padding:11px 13px;border:0;border-radius:9px;background:#e6bd65;color:#172337;font-weight:bold;margin:3px}.secondary{background:#394b62;color:white}.danger{background:#793d43;color:white}.song{display:flex;align-items:center;gap:10px}.songinfo{flex:1;min-width:0;overflow-wrap:anywhere}.songinfo small{display:block;color:#b9c3d0;margin-top:5px}.lyrics{white-space:pre-wrap;text-align:center;line-height:2;background:#202d40;padding:20px;border-radius:12px}nav{position:fixed;bottom:0;left:0;width:100%;background:#172337;display:flex;justify-content:space-around;padding:12px}nav button{background:none;border:0;color:#b9c3d0}nav button.active{color:#e6bd65}.empty{text-align:center;color:#b9c3d0;padding:20px}.status{padding:10px;border-radius:9px;background:#202d40;color:#d9e2ef;font-size:13px;margin:10px 0}.checkrow{display:flex;align-items:center;gap:8px;margin:8px 0 15px}.checkrow input{width:auto;margin:0}
+</style></head><body>
+<header><div class="logo">🎵 ይዲድያ መዝሙር</div><div class="sub">የመዝሙር መድብል • Gospel Songs</div><div id="netstatus" class="sub">Connecting…</div></header>
+<section id="home" class="page active"><div class="welcome"><b>እንኳን ወደ ይዲድያ መዝሙር በደህና መጡ!</b><p>የእግዚአብሔርን ስም በመዝሙር እና በውዳሴ እናክብር።</p></div><div id="syncstatus" class="status">Songs will appear here after the first internet sync.</div><input id="search" placeholder="🔍 መዝሙር ፈልግ..." oninput="render()"><select id="filter" onchange="render()"><option value="">ሁሉም ምድቦች</option></select><h3>የመዝሙር ዝርዝር</h3><div id="list"></div></section>
+<section id="loginpage" class="page"><h2>Administrator sign in</h2><p class="hint">Only the administrator can add, edit, publish, or delete songs.</p><label>Email</label><input id="email" type="email" autocomplete="username"><label>Password</label><input id="password" type="password" autocomplete="current-password"><button class="btn" id="loginbtn">Sign in</button><button class="btn secondary" onclick="show('home')">Back</button><div id="loginmsg" class="hint"></div></section>
+<section id="formpage" class="page"><h2 id="formtitle">➕ አዲስ መዝሙር</h2><form id="songform"><label>የመዝሙር ርዕስ *</label><input id="title" required><label>የዘማሪ / የቡድን ስም</label><input id="singer"><label>ምድብ</label><select id="category"><option>የምስጋና መዝሙር</option><option>የአምልኮ መዝሙር</option><option>የእምነት መዝሙር</option><option>የበዓል መዝሙር</option><option>ሌላ</option></select><label>የመዝሙሩ ግጥም *</label><textarea id="lyrics" required></textarea><label class="checkrow"><input id="published" type="checkbox"> Publish this song for everyone</label><button class="btn" type="submit">💾 Save song</button><button class="btn secondary" type="button" onclick="show('home')">Cancel</button></form></section>
+<section id="detail" class="page"><button class="btn secondary" onclick="show('home')">← ተመለስ</button><h2 id="dtitle"></h2><p id="dmeta" class="meta"></p><div id="dlyrics" class="lyrics"></div><div id="adminactions"></div></section>
+<section id="adminpage" class="page"><h2>Administrator</h2><div id="adminwho" class="status"></div><button class="btn" onclick="newSong()">＋ Add a song</button><button class="btn secondary" id="importbtn">Import songs from old app</button><button class="btn secondary" id="logoutbtn">Sign out</button><p class="hint">Import reads the songs saved in your old app on this same phone. It does not delete them.</p><div id="adminmsg" class="hint"></div></section>
+<nav><button class="active" onclick="show('home',this)">🏠 ዋና ገጽ</button><button id="adminnav" onclick="adminNav()">🔐 Admin</button></nav>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js";
+import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
+const firebaseConfig={apiKey:"AIzaSyDHqvn2ZicZYdI46N1Vakt42d0stYbzmhQ",authDomain:"yedidiyamezmur.firebaseapp.com",projectId:"yedidiyamezmur",storageBucket:"yedidiyamezmur.firebasestorage.app",messagingSenderId:"27081045128",appId:"1:27081045128:web:25c8a2ea092e47bc3edb3d",measurementId:"G-WFJFKCYLE1"};
+const ADMIN_UID="gMQt4UDNQCWQ581DEkwiCBRQk9y2";const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);let user=null,items=[],editId=null,activeId=null;
+const $=id=>document.getElementById(id);const songsRef=collection(db,"songs");
+function show(id,btn){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));$(id).classList.add('active');document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');if(id==='home')render()}
+window.show=show;window.adminNav=()=>show(user?.uid===ADMIN_UID?'adminpage':'loginpage',$('adminnav'));
+function esc(x){return String(x||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function render(){const q=$('search').value.toLowerCase(),cat=$('filter').value;const arr=items.filter(s=>(s.title+' '+(s.singer||'')+' '+(s.lyrics||'')).toLowerCase().includes(q)&&(!cat||s.category===cat));$('list').innerHTML=arr.length?arr.map(s=>`<div class="song"><div>🎵</div><div class="songinfo" onclick="window.openSong('${s.id}')"><b>${esc(s.title)}</b><small>${esc(s.singer||s.category||'')} ${s.published===false?' · Draft':''}</small></div></div>`).join(''):'<div class="empty">መዝሙር የለም።</div>';const cats=[...new Set(items.map(s=>s.category).filter(Boolean))],f=$('filter'),v=f.value;f.innerHTML='<option value="">ሁሉም ምድቦች</option>'+cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');f.value=v}
+window.openSong=id=>{const s=items.find(x=>x.id===id);if(!s)return;activeId=id;$('dtitle').textContent=s.title;$('dmeta').textContent=[s.singer,s.category,s.published===false?'Draft':''].filter(Boolean).join(' • ');$('dlyrics').textContent=s.lyrics||'';$('adminactions').innerHTML=user?.uid===ADMIN_UID?`<button class="btn" onclick="window.editSong('${id}')">✏️ Edit</button><button class="btn danger" onclick="window.removeSong('${id}')">Delete</button>`:'';show('detail')};
+window.editSong=id=>{const s=items.find(x=>x.id===id);if(!s||user?.uid!==ADMIN_UID)return;editId=id;$('title').value=s.title;$('singer').value=s.singer||'';$('category').value=s.category||'ሌላ';$('lyrics').value=s.lyrics||'';$('published').checked=!!s.published;$('formtitle').textContent='✏️ Edit song';show('formpage')};
+window.removeSong=async id=>{if(user?.uid!==ADMIN_UID||!confirm('Delete this song?'))return;try{await deleteDoc(doc(db,'songs',id));await loadSongs();show('home')}catch(e){alert('Could not delete. Check internet and administrator access.')}};
+window.newSong=()=>{if(user?.uid!==ADMIN_UID){show('loginpage');return}editId=null;$('songform').reset();$('published').checked=false;$('formtitle').textContent='➕ አዲስ መዝሙር';show('formpage')};
+async function loadSongs(){try{const snap=user?.uid===ADMIN_UID?await getDocs(songsRef):await getDocs(query(songsRef,where('published','==',true)));items=snap.docs.map(d=>({id:d.id,...d.data()}));await saveCache(items);$('syncstatus').textContent='Online sync complete. '+items.length+' song(s) loaded.';render()}catch(e){items=await readCache();$('syncstatus').textContent='Offline or sync failed. Showing '+items.length+' song(s) saved on this phone.';render();console.error(e)}}
+function openCache(){return new Promise((resolve,reject)=>{const r=indexedDB.open('YedidiyaCloudCache',1);r.onupgradeneeded=()=>r.result.createObjectStore('songs',{keyPath:'id'});r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
+async function saveCache(arr){const d=await openCache();await new Promise((ok,no)=>{const t=d.transaction('songs','readwrite'),s=t.objectStore('songs');s.clear();arr.forEach(x=>s.put(x));t.oncomplete=ok;t.onerror=()=>no(t.error)});d.close()}
+async function readCache(){try{const d=await openCache();const a=await new Promise((ok,no)=>{const r=d.transaction('songs').objectStore('songs').getAll();r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)});d.close();return a}catch{return []}}
+$('songform').onsubmit=async e=>{e.preventDefault();if(user?.uid!==ADMIN_UID){alert('Administrator sign-in is required.');return}const data={title:$('title').value.trim(),singer:$('singer').value.trim(),category:$('category').value,lyrics:$('lyrics').value.trim(),published:$('published').checked,updatedAt:serverTimestamp()};try{if(editId)await updateDoc(doc(db,'songs',editId),data);else await addDoc(songsRef,{...data,createdAt:serverTimestamp()});editId=null;await loadSongs();show('home');alert('Song saved.')}catch(err){console.error(err);alert('Save failed. Please check your internet connection and Firestore rules.')}};
+$('loginbtn').type='button';
+$('loginbtn').onclick=async()=>{
+  const email=$('email').value.trim();
+  const password=$('password').value;
+  const btn=$('loginbtn');
+  $('loginmsg').textContent='Signing in…';
+  btn.disabled=true;
+  try{
+    const credential=await signInWithEmailAndPassword(auth,email,password);
+    if(credential.user.uid!==ADMIN_UID){
+      await signOut(auth);
+      $('loginmsg').textContent='This account is not the administrator account.';
+      return;
+    }
+    $('password').value='';
+    $('loginmsg').textContent='Signed in successfully.';
+    show('adminpage',$('adminnav'));
+  }catch(e){
+    console.error('Firebase sign-in error:',e);
+    const messages={
+      'auth/invalid-credential':'Email or password is incorrect. Please check both and try again.',
+      'auth/invalid-email':'Please enter a valid email address.',
+      'auth/user-disabled':'This administrator account is disabled.',
+      'auth/too-many-requests':'Too many attempts. Wait a little and try again.',
+      'auth/network-request-failed':'Network request failed. Check your internet connection.',
+      'auth/unauthorized-domain':'This preview address is not authorized in Firebase Authentication.',
+      'auth/operation-not-allowed':'Email/password sign-in is not enabled in Firebase Authentication.'
+    };
+    $('loginmsg').textContent=(messages[e.code]||('Sign-in failed ('+(e.code||'unknown error')+'). Please tell me this error code.'));
+  }finally{
+    btn.disabled=false;
+  }
+};
+$('logoutbtn').onclick=()=>signOut(auth);
+onAuthStateChanged(auth,async u=>{user=u;const isAdmin=u?.uid===ADMIN_UID;$('adminwho').textContent=isAdmin?'Administrator signed in.':'Not signed in.';$('adminnav').textContent=isAdmin?'⚙️ Admin':'🔐 Admin';$('netstatus').textContent=navigator.onLine?'Internet connection available':'Offline';await loadSongs();if(isAdmin&&$('adminpage').classList.contains('active'))show('adminpage')});
+window.addEventListener('online',()=>{$('netstatus').textContent='Internet connection available';loadSongs()});window.addEventListener('offline',()=>{$('netstatus').textContent='Offline'});
+$('importbtn').onclick=async()=>{if(user?.uid!==ADMIN_UID)return;const msg=$('adminmsg');msg.textContent='Checking old app songs…';try{const old=await new Promise((ok,no)=>{const r=indexedDB.open('YedidiyaSongs',1);r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)});if(!old.objectStoreNames.contains('songs')){old.close();msg.textContent='No old song database was found on this phone.';return}const oldSongs=await new Promise((ok,no)=>{const r=old.transaction('songs').objectStore('songs').getAll();r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)});old.close();let count=0;for(const s of oldSongs){await addDoc(songsRef,{title:s.title||'Untitled',singer:s.singer||'',category:s.category||'ሌላ',lyrics:s.lyrics||'',published:false,createdAt:serverTimestamp(),importedFromOldApp:true});count++}msg.textContent=count+' song(s) imported as drafts. Review and publish each song after checking it.';await loadSongs()}catch(e){console.error(e);msg.textContent='Import failed. Open the old app on this same phone first, then try again.'}};
+if(!navigator.onLine)$('netstatus').textContent='Offline';
+</script></body></html>
